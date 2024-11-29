@@ -3,7 +3,7 @@ use std::{env, str::FromStr};
 
 use anyhow::Result;
 use tokio_cron_scheduler::{Job, JobScheduler};
-use tracing::{error, Level};
+use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
@@ -34,14 +34,13 @@ async fn main() -> Result<()> {
                     Ok(_) => {}
                     Err(e) => {
                         error!("{}", e);
-                        return;
                     }
                 };
                 // // Query the next execution time for this job
                 let next_tick = l.next_tick_for_job(uuid).await;
                 match next_tick {
-                    Ok(Some(ts)) => println!("Next time for 4s job is {:?}", ts),
-                    _ => println!("Could not get next tick for 4s job"),
+                    Ok(Some(ts)) => info!("Next time for job is {:?}", ts),
+                    _ => info!("Could not get next tick for job"),
                 }
             })
         })?)
@@ -50,7 +49,9 @@ async fn main() -> Result<()> {
     sched.start().await?;
 
     // Wait while the jobs run
-    tokio::time::sleep(Duration::from_secs(100)).await;
+    loop {
+        std::thread::sleep(Duration::from_millis(100));
+    }
     // let resp = reqwest::get(ep).await?.text().await?;
     // let data: serde_yaml::Value = serde_yaml::from_str(&resp)?;
 
@@ -62,7 +63,6 @@ async fn main() -> Result<()> {
     // //     .map(|s| s.to_string())
     // //     .ok_or(anyhow!("Could not find key foo.bar in something.yaml"));
     // println!("{:?}", image);
-    Ok(())
 }
 
 async fn process(ep: String, _token: String) -> Result<(), anyhow::Error> {
@@ -70,9 +70,9 @@ async fn process(ep: String, _token: String) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!("ENTRYPOINT cannot be empty"));
     }
 
-    let res = reqwest::get(ep).await?;
+    let res = reqwest::get(ep.clone()).await?;
     if res.status() != reqwest::StatusCode::OK {
-        return Err(anyhow::anyhow!("Invalid request: {}", res.status()));
+        return Err(anyhow::anyhow!("Invalid request: {}, {}", res.status(), ep));
     } else {
         let resptext = res.text().await?;
         let data: serde_yaml::Value = serde_yaml::from_str(&resptext)?;

@@ -3,7 +3,7 @@ use std::{env, str::FromStr};
 
 use anyhow::Result;
 use tokio_cron_scheduler::{Job, JobScheduler};
-use tracing::Level;
+use tracing::{error, Level};
 use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
@@ -29,42 +29,14 @@ async fn main() -> Result<()> {
         .add(Job::new_async(schedule, |uuid, mut l| {
             Box::pin(async move {
                 let _token = std::env::var("CLOS_TOKEN").unwrap_or_default();
-                let ep =
-                    std::env::var("ENDPOINT").expect("ENDPOINT environment variable must be set");
-                let req = match reqwest::get(ep).await {
-                    Ok(r) => r,
+                let ep = std::env::var("ENDPOINT").expect("ENDPOINT Not Configured");
+                match process(ep, _token).await {
+                    Ok(_) => {}
                     Err(e) => {
-                        println!("Error downloading file: {}", e);
-                        return;
+                        return error!("{}", e);
                     }
                 };
-                let resp = match req.text().await {
-                    Ok(r) => r,
-                    Err(e) => {
-                        println!("Error extracting text: {}", e);
-                        return;
-                    }
-                };
-                let data: serde_yaml::Value = match serde_yaml::from_str(&resp) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        println!("Error parsing yaml: {}", e);
-                        return;
-                    }
-                };
-
-                println!("{data:#?}");
-                let image = data["closConfig"][0]["image"].clone();
-                let currentimage = "";
-                if currentimage == image.as_str().unwrap_or_default() {}
-                //data.get())
-                // let image = data[0][0]
-                //     .as_str()
-                //     .map(|s| s.to_string())
-                //     .ok_or(anyhow!("Could not find key foo.bar in something.yaml"));
-                println!("{:?}", image);
-
-                // Query the next execution time for this job
+                // // Query the next execution time for this job
                 let next_tick = l.next_tick_for_job(uuid).await;
                 match next_tick {
                     Ok(Some(ts)) => println!("Next time for 4s job is {:?}", ts),
@@ -90,4 +62,59 @@ async fn main() -> Result<()> {
     // //     .ok_or(anyhow!("Could not find key foo.bar in something.yaml"));
     // println!("{:?}", image);
     Ok(())
+}
+
+async fn process(ep: String, _token: String) -> Result<(), anyhow::Error> {
+    if ep == "".to_string() {
+        return Err(anyhow::anyhow!("ENTRYPOINT cannot be empty"));
+    }
+
+    let req = reqwest::get(ep).await?;
+    let resp = req.text().await?;
+
+    let data: serde_yaml::Value = serde_yaml::from_str(&resp)?;
+    let image = data["closConfig"][0]["image"].clone();
+    let currentimage = "";
+    if currentimage == image.as_str().unwrap_or_default() {}
+    //data.get())
+    // let image = data[0][0]
+    //     .as_str()
+    //     .map(|s| s.to_string())
+    //     .ok_or(anyhow!("Could not find key foo.bar in something.yaml"));
+    println!("{:?}", image);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_process_no_endpoint() {
+    use wiremock::matchers::method;
+    use wiremock::matchers::path;
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&mock_server)
+        .await;
+
+    let result = process("".to_string(), "".to_string()).await;
+    assert!(result.is_err())
+}
+
+#[tokio::test]
+
+async fn test_process_request_ok() {
+    use wiremock::matchers::method;
+    use wiremock::matchers::path;
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&mock_server)
+        .await;
+    let result = process(mock_server.uri(), "".to_owned()).await;
+    assert!(!result.is_err())
 }

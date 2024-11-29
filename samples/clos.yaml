@@ -1,0 +1,2 @@
+closConfig:
+- image: quay.io/fedora/fedora-bootc@sha256:5aed3ee3cb05929dd33e2067a19037d8fe06dee7687b7c61739f88238dacc9c5

@@ -33,7 +33,8 @@ async fn main() -> Result<()> {
                 match process(ep, _token).await {
                     Ok(_) => {}
                     Err(e) => {
-                        return error!("{}", e);
+                        error!("{}", e);
+                        return;
                     }
                 };
                 // // Query the next execution time for this job
@@ -65,23 +66,26 @@ async fn main() -> Result<()> {
 }
 
 async fn process(ep: String, _token: String) -> Result<(), anyhow::Error> {
-    if ep == "".to_string() {
+    if ep == *"" {
         return Err(anyhow::anyhow!("ENTRYPOINT cannot be empty"));
     }
 
-    let req = reqwest::get(ep).await?;
-    let resp = req.text().await?;
-
-    let data: serde_yaml::Value = serde_yaml::from_str(&resp)?;
-    let image = data["closConfig"][0]["image"].clone();
-    let currentimage = "";
-    if currentimage == image.as_str().unwrap_or_default() {}
-    //data.get())
-    // let image = data[0][0]
-    //     .as_str()
-    //     .map(|s| s.to_string())
-    //     .ok_or(anyhow!("Could not find key foo.bar in something.yaml"));
-    println!("{:?}", image);
+    let res = reqwest::get(ep).await?;
+    if res.status() != reqwest::StatusCode::OK {
+        return Err(anyhow::anyhow!("Invalid request: {}", res.status()));
+    } else {
+        let resptext = res.text().await?;
+        let data: serde_yaml::Value = serde_yaml::from_str(&resptext)?;
+        let image = data["closConfig"][0]["image"].clone();
+        let _currentimage = "";
+        // if currentimage == image.as_str().unwrap_or_default() {}
+        //data.get())
+        // let image = data[0][0]
+        //     .as_str()
+        //     .map(|s| s.to_string())
+        //     .ok_or(anyhow!("Could not find key foo.bar in something.yaml"));
+        println!("{:?}", image);
+    }
     Ok(())
 }
 
@@ -99,6 +103,23 @@ async fn test_process_no_endpoint() {
         .await;
 
     let result = process("".to_string(), "".to_string()).await;
+    assert!(result.is_err())
+}
+
+#[tokio::test]
+async fn test_process_404() {
+    use wiremock::matchers::method;
+    use wiremock::matchers::path;
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&mock_server)
+        .await;
+
+    let result = process(mock_server.uri(), "".to_string()).await;
     assert!(result.is_err())
 }
 

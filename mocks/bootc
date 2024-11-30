@@ -1,0 +1,32 @@
+#!/bin/bash 
+echo " 
+apiVersion: org.containers.bootc/v1
+kind: BootcHost
+metadata:
+  name: host
+spec:
+  image:
+    image: quay.io/mehal_tech/clos:v0.0.6
+    transport: registry
+  bootOrder: default
+status:
+  staged: null
+  booted:
+    image:
+      image:
+        image: quay.io/mehal_tech/clos:v0.0.6
+        transport: registry
+      version: 40.20241023.0
+      timestamp: null
+      imageDigest: sha256:ed3e3f40c0db29da93bd7f805640e9f5c5b1aec5d80fbfe29250485260aa8cdf
+    cachedUpdate: null
+    incompatible: false
+    pinned: false
+    store: ostreeContainer
+    ostree:
+      checksum: d9cbe3027e2874ed6f224e6fbc461e135e00c582545bae231782d0b2b8c6efc5
+      deploySerial: 0
+  rollback: null
+  rollbackQueued: false
+  type: bootcHost
+"

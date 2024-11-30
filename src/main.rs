@@ -1,9 +1,12 @@
+use std::io::{Error, Read};
+
+use std::process::{Command, Stdio};
 use std::time::Duration;
 use std::{env, str::FromStr};
 
 use anyhow::Result;
 use tokio_cron_scheduler::{Job, JobScheduler};
-use tracing::{error, info, Level};
+use tracing::{debug, error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
@@ -30,7 +33,8 @@ async fn main() -> Result<()> {
             Box::pin(async move {
                 let _token = std::env::var("CLOS_TOKEN").unwrap_or_default();
                 let ep = std::env::var("ENDPOINT").expect("ENDPOINT Not Configured");
-                match process(ep, _token).await {
+                let bin_path = std::env::var("BROG_PATH").unwrap_or_default();
+                match process(ep, _token, bin_path).await {
                     Ok(_) => {}
                     Err(e) => {
                         error!("{}", e);
@@ -65,19 +69,24 @@ async fn main() -> Result<()> {
     // println!("{:?}", image);
 }
 
-async fn process(ep: String, _token: String) -> Result<(), anyhow::Error> {
+async fn process(ep: String, _token: String, bin_path: String) -> Result<String, anyhow::Error> {
     if ep == *"" {
         return Err(anyhow::anyhow!("ENTRYPOINT cannot be empty"));
     }
 
     let res = reqwest::get(ep.clone()).await?;
     if res.status() != reqwest::StatusCode::OK {
-        return Err(anyhow::anyhow!("Invalid request: {}, {}", res.status(), ep));
+        Err(anyhow::anyhow!("Invalid request: {}, {}", res.status(), ep))
     } else {
         let resptext = res.text().await?;
         let data: serde_yaml::Value = serde_yaml::from_str(&resptext)?;
         let image = data["closConfig"][0]["image"].clone();
+
         let _currentimage = "";
+        let args = vec![];
+        let text = run_command_text(args, bin_path.as_str())?;
+
+        let _data: serde_yaml::Value = serde_yaml::from_str(&text)?;
         // if currentimage == image.as_str().unwrap_or_default() {}
         //data.get())
         // let image = data[0][0]
@@ -85,8 +94,50 @@ async fn process(ep: String, _token: String) -> Result<(), anyhow::Error> {
         //     .map(|s| s.to_string())
         //     .ok_or(anyhow!("Could not find key foo.bar in something.yaml"));
         println!("{:?}", image);
+        let retval = image.as_str().unwrap_or_default().to_owned();
+        Ok(retval)
     }
-    Ok(())
+}
+
+fn run_command_text(args: Vec<&str>, bin_path: &str) -> Result<String, anyhow::Error> {
+    debug!("running {:?} {:?}", args, bin_path);
+
+    let cmd = Command::new("bootc")
+        .env("PATH", bin_path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .args(&args)
+        .spawn()?;
+
+    let waiter = cmd.wait_with_output()?;
+
+    let mut err_str = String::new();
+    waiter.stderr.as_slice().read_to_string(&mut err_str)?;
+    if !err_str.is_empty() {
+        let err = format!(
+            "stderr not empty - failed to execute bootc {:?} {}",
+            args, err_str
+        );
+        return Err(Error::new(std::io::ErrorKind::InvalidData, err).into());
+    }
+    let mut ok_str = String::new();
+    match waiter.stdout.as_slice().read_to_string(&mut ok_str) {
+        Err(e) => Err(e.into()),
+        Ok(_) => Ok(ok_str),
+    }
+}
+
+#[tokio::test]
+async fn test_bootc_output() {
+    use std::path::Path;
+    let args = vec![];
+    let mut path = env::current_dir().unwrap_or_default();
+    let mock = Path::new("mocks");
+    path.push(mock);
+    let bin_path = path.to_str().unwrap_or_default();
+    let res = run_command_text(args, bin_path);
+    let text = res.unwrap();
+    assert!(text.contains("apiVersion: org.containers.bootc/v1"));
 }
 
 #[tokio::test]
@@ -102,7 +153,7 @@ async fn test_process_no_endpoint() {
         .mount(&mock_server)
         .await;
 
-    let result = process("".to_string(), "".to_string()).await;
+    let result = process("".to_string(), "".to_string(), "".to_string()).await;
     assert!(result.is_err())
 }
 
@@ -119,23 +170,33 @@ async fn test_process_404() {
         .mount(&mock_server)
         .await;
 
-    let result = process(mock_server.uri(), "".to_string()).await;
+    let result = process(mock_server.uri(), "".to_string(), "".to_string()).await;
     assert!(result.is_err())
 }
 
 #[tokio::test]
 
 async fn test_process_request_ok() {
+    use std::fs;
+    use std::path::Path;
     use wiremock::matchers::method;
-    use wiremock::matchers::path;
     use wiremock::{Mock, MockServer, ResponseTemplate};
     let mock_server = MockServer::start().await;
+    let body =
+        fs::read_to_string("samples/clos.yaml").expect("Should have been able to read the file");
+
+    let rt = ResponseTemplate::new(200).set_body_string(body);
+    let mut path = env::current_dir().unwrap_or_default();
+    let mock = Path::new("mocks");
+    path.push(mock);
+    let bootcpath = path.to_str().unwrap_or_default();
 
     Mock::given(method("GET"))
-        .and(path("/"))
-        .respond_with(ResponseTemplate::new(200))
+        .and(wiremock::matchers::path("/"))
+        .respond_with(rt)
         .mount(&mock_server)
         .await;
-    let result = process(mock_server.uri(), "".to_owned()).await;
-    assert!(!result.is_err())
+    let result = process(mock_server.uri(), "".to_owned(), bootcpath.to_string()).await;
+    assert!(!result.is_err());
+    assert_eq!("quay.io/fedora/fedora-bootc@sha256:5aed3ee3cb05929dd33e2067a19037d8fe06dee7687b7c61739f88238dacc9c5".to_owned(), result.unwrap())
 }

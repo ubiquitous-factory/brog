@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
             Box::pin(async move {
                 let _token = std::env::var("CLOS_TOKEN").unwrap_or_default();
                 let ep = std::env::var("ENDPOINT").expect("ENDPOINT Not Configured");
-                let bin_path = std::env::var("BROG_PATH").unwrap_or_default();
+                let bin_path = std::env::var("BROG_PATH").unwrap_or("/host/usr/bin".to_owned());
                 match process(ep, _token, bin_path).await {
                     Ok(_) => {}
                     Err(e) => {
@@ -56,17 +56,6 @@ async fn main() -> Result<()> {
     loop {
         std::thread::sleep(Duration::from_millis(100));
     }
-    // let resp = reqwest::get(ep).await?.text().await?;
-    // let data: serde_yaml::Value = serde_yaml::from_str(&resp)?;
-
-    // println!("{data:#?}");
-    // let image = data["closConfig"][0]["image"].clone();
-    // //data.get())
-    // // let image = data[0][0]
-    // //     .as_str()
-    // //     .map(|s| s.to_string())
-    // //     .ok_or(anyhow!("Could not find key foo.bar in something.yaml"));
-    // println!("{:?}", image);
 }
 
 async fn process(ep: String, _token: String, bin_path: String) -> Result<String, anyhow::Error> {
@@ -80,22 +69,21 @@ async fn process(ep: String, _token: String, bin_path: String) -> Result<String,
     } else {
         let resptext = res.text().await?;
         let data: serde_yaml::Value = serde_yaml::from_str(&resptext)?;
-        let image = data["closConfig"][0]["image"].clone();
+        let image = data["clientConfig"][0]["image"].as_str();
 
-        let _currentimage = "";
-        let args = vec![];
+        let requiredimage = if let Some(i) = image {
+            i
+        } else {
+            return Err(anyhow::anyhow!(
+                "clientConfig-image is not a string {:?}",
+                image
+            ));
+        };
+
+        let args = vec!["switch", requiredimage, "--apply"];
         let text = run_command_text(args, bin_path.as_str())?;
-
         let _data: serde_yaml::Value = serde_yaml::from_str(&text)?;
-        // if currentimage == image.as_str().unwrap_or_default() {}
-        //data.get())
-        // let image = data[0][0]
-        //     .as_str()
-        //     .map(|s| s.to_string())
-        //     .ok_or(anyhow!("Could not find key foo.bar in something.yaml"));
-        println!("{:?}", image);
-        let retval = image.as_str().unwrap_or_default().to_owned();
-        Ok(retval)
+        Ok(requiredimage.to_owned())
     }
 }
 
@@ -183,7 +171,7 @@ async fn test_process_request_ok() {
     use wiremock::{Mock, MockServer, ResponseTemplate};
     let mock_server = MockServer::start().await;
     let body =
-        fs::read_to_string("samples/clos.yaml").expect("Should have been able to read the file");
+        fs::read_to_string("samples/brog.yaml").expect("Should have been able to read the file");
 
     let rt = ResponseTemplate::new(200).set_body_string(body);
     let mut path = env::current_dir().unwrap_or_default();

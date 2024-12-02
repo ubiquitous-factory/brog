@@ -50,10 +50,10 @@ A gitops client for bootc.
 
 |Item|Complete|
 |---|---|
-|Open http endpoint|[x]|
-|Send Machine Identifier in request|[ ]|
-|Integrate with secrets managment systems|[ ]|
-|Private GitHub Repo|[ ]|
-|Private Gitlab Repo|[ ]|
-|Canary Support from [CLOS](https://mehal.tech/clos)|[ ]|
-|Container Based Deployment|[ ]|
+|Open http endpoint|&#x2611;|
+|Send Machine Identifier in request|&#x2610;|
+|Integrate with secrets managment systems|&#x2610;|
+|Private GitHub Repo|&#x2610;|
+|Private Gitlab Repo|&#x2610;|
+|Canary Support from [CLOS](https://mehal.tech/clos)|&#x2610;|
+|Container Based Deployment|&#x2610;|

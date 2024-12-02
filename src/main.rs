@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
             Box::pin(async move {
                 let _token = std::env::var("CLOS_TOKEN").unwrap_or_default();
                 let ep = std::env::var("ENDPOINT").expect("ENDPOINT Not Configured");
-                let bin_path = std::env::var("BROG_PATH").unwrap_or("/host/usr/bin".to_owned());
+                let bin_path = std::env::var("BROG_PATH").unwrap_or("/usr/bin".to_owned());
                 match process(ep, _token, bin_path).await {
                     Ok(_) => {}
                     Err(e) => {

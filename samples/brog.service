@@ -3,7 +3,7 @@ Description=brog bootc management tool
 After=network.target
 
 [Service]
-Type=forking
+Type=simple
 RemainAfterExit=yes
 ExecStart=/usr/bin/brog
 TimeoutStartSec=0

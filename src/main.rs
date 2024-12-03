@@ -1,14 +1,15 @@
+use std::fs;
 use std::io::{Error, Read};
 
+use anyhow::Result;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 use std::{env, str::FromStr};
-
-use anyhow::Result;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::{debug, error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
+use reqwest::header::{HeaderName, HeaderValue};
 #[tokio::main]
 async fn main() -> Result<()> {
     if dotenvy::dotenv().is_ok() {
@@ -59,14 +60,25 @@ async fn main() -> Result<()> {
 }
 
 async fn process(ep: String, _token: String, bin_path: String) -> Result<String, anyhow::Error> {
+    info!("Starting process");
     if ep == *"" {
         return Err(anyhow::anyhow!("ENTRYPOINT cannot be empty"));
     }
+    let machineid = fs::read_to_string("/etc/machine-id")?;
+    info!("Setting BrogMachineId: {}", machineid.trim());
+    let client = reqwest::Client::new();
+    let machinevalue = HeaderValue::from_str(machineid.as_str().trim())?;
+    info!("Sending request");
 
-    let res = reqwest::get(ep.clone()).await?;
+    let res = client
+        .get(ep.clone())
+        .header(HeaderName::from_static("x-brog-mid"), machinevalue)
+        .send()
+        .await?;
     if res.status() != reqwest::StatusCode::OK {
         Err(anyhow::anyhow!("Invalid request: {}, {}", res.status(), ep))
     } else {
+        info!("Parsing response text");
         let resptext = res.text().await?;
         let data: serde_yaml::Value = serde_yaml::from_str(&resptext)?;
         let image = data["clientConfig"][0]["image"].as_str();
@@ -81,6 +93,7 @@ async fn process(ep: String, _token: String, bin_path: String) -> Result<String,
         };
 
         let args = vec!["switch", requiredimage, "--apply"];
+        info!("Updating: {:?}", args);
         let text = run_command_text(args, bin_path.as_str())?;
         let _data: serde_yaml::Value = serde_yaml::from_str(&text)?;
         Ok(requiredimage.to_owned())

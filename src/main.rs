@@ -9,7 +9,7 @@ use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::{debug, error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
-use reqwest::header::{HeaderName, HeaderValue};
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION};
 #[tokio::main]
 async fn main() -> Result<()> {
     if dotenvy::dotenv().is_ok() {
@@ -59,22 +59,32 @@ async fn main() -> Result<()> {
     }
 }
 
-async fn process(ep: String, _token: String, bin_path: String) -> Result<String, anyhow::Error> {
+async fn process(ep: String, token: String, bin_path: String) -> Result<String, anyhow::Error> {
     info!("Starting process");
     if ep == *"" {
         return Err(anyhow::anyhow!("ENTRYPOINT cannot be empty"));
     }
+
     let machineid = fs::read_to_string("/etc/machine-id")?;
-    info!("Setting BrogMachineId: {}", machineid.trim());
+    info!("Setting x-brog-mid: {}", machineid.trim());
+
+    // Authorization: SharedKey myaccount:ctzMq410TV3wS7upTBcunJTDLEJwMAZuFPfr0mrrA08=
+
     let client = reqwest::Client::new();
     let machinevalue = HeaderValue::from_str(machineid.as_str().trim())?;
-    info!("Sending request");
 
-    let res = client
-        .get(ep.clone())
-        .header(HeaderName::from_static("x-brog-mid"), machinevalue)
-        .send()
-        .await?;
+    let mut headers = HeaderMap::new();
+    headers.insert(HeaderName::from_static("x-brog-mid"), machinevalue);
+
+    if !token.is_empty() {
+        info!("Found token and creating AUTHORIZATION header");
+        let sharedkey = format!("SharedKey: {}", token.trim());
+        let sharedvalue = HeaderValue::from_str(sharedkey.as_str())?;
+        headers.insert(AUTHORIZATION, sharedvalue);
+    }
+
+    info!("Sending request");
+    let res = client.get(ep.clone()).headers(headers).send().await?;
     if res.status() != reqwest::StatusCode::OK {
         Err(anyhow::anyhow!("Invalid request: {}, {}", res.status(), ep))
     } else {

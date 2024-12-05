@@ -1,8 +1,7 @@
 use std::fs;
 use std::io::{Error, Read};
-
-use anyhow::Result;
 use std::process::{Command, Stdio};
+use std::result::Result::Ok;
 use std::time::Duration;
 use std::{env, str::FromStr};
 use tokio_cron_scheduler::{Job, JobScheduler};
@@ -10,8 +9,14 @@ use tracing::{debug, error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION};
+
+mod sign;
+
+#[macro_use]
+extern crate error_chain;
+
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> Result<(), anyhow::Error> {
     if dotenvy::dotenv().is_ok() {
         println!("Using .env")
     }
@@ -32,10 +37,11 @@ async fn main() -> Result<()> {
     sched
         .add(Job::new_async(schedule, |uuid, mut l| {
             Box::pin(async move {
-                let _token = std::env::var("CLOS_TOKEN").unwrap_or_default();
+                let key = std::env::var("BROG_KEY").unwrap_or_default();
+                let secret = std::env::var("BROG_SECRET").unwrap_or_default();
                 let ep = std::env::var("ENDPOINT").expect("ENDPOINT Not Configured");
                 let bin_path = std::env::var("BROG_PATH").unwrap_or("/usr/bin".to_owned());
-                match process(ep, _token, bin_path).await {
+                match process(ep, key, secret, bin_path).await {
                     Ok(_) => {}
                     Err(e) => {
                         error!("{}", e);
@@ -59,28 +65,89 @@ async fn main() -> Result<()> {
     }
 }
 
-async fn process(ep: String, token: String, bin_path: String) -> Result<String, anyhow::Error> {
+// let mut hasher = Sha256::default();
+//     hasher.update(canonical_req.as_bytes());
+//     let string_to = format!(
+//         "AWS4-HMAC-SHA256\n{timestamp}\n{scope}\n{hash}",
+//         timestamp = date_time.format(LONG_DATETIME_FMT),
+//         scope = scope_string(date_time, ),
+//         hash = hex::encode(hasher.finalize().as_slice())
+//     );
+//     string_to
+
+// fn sign(
+//     headers: String,
+//     secret: String,
+// ) -> Result<
+//     GenericArray<u8, UInt<UInt<UInt<UInt<UInt<UInt<UTerm, B1>, B0>, B0>, B0>, B0>, B0>>,
+//     anyhow::Error,
+// > {
+//     let mut mac = HmacSha256::new_from_slice(secret.as_bytes())?;
+//     mac.update(headers.as_bytes());
+
+//     // `result` has type `CtOutput` which is a thin wrapper around array of
+//     // bytes for providing constant time equality check
+//     let result = mac.finalize();
+//     // To get underlying array use `into_bytes`, but be careful, since
+//     // incorrect use of the code value may permit timing attacks which defeats
+//     // the security provided by the `CtOutput`
+//     Ok(result.into_bytes())
+//     //let code_bytes = result;
+// }
+
+async fn process(
+    ep: String,
+    key: String,
+    secret: String,
+    bin_path: String,
+) -> Result<String, anyhow::Error> {
     info!("Starting process");
     if ep == *"" {
         return Err(anyhow::anyhow!("ENTRYPOINT cannot be empty"));
     }
 
     let machineid = fs::read_to_string("/etc/machine-id")?;
-    info!("Setting x-brog-mid: {}", machineid.trim());
+    info!("Setting x-mhl-mid: {}", machineid.trim());
 
     // Authorization: SharedKey myaccount:ctzMq410TV3wS7upTBcunJTDLEJwMAZuFPfr0mrrA08=
 
     let client = reqwest::Client::new();
-    let machinevalue = HeaderValue::from_str(machineid.as_str().trim())?;
 
     let mut headers = HeaderMap::new();
-    headers.insert(HeaderName::from_static("x-brog-mid"), machinevalue);
 
-    if !token.is_empty() {
-        info!("Found token and creating AUTHORIZATION header");
-        let sharedkey = format!("SharedKey: {}", token.trim());
-        let sharedvalue = HeaderValue::from_str(sharedkey.as_str())?;
-        headers.insert(AUTHORIZATION, sharedvalue);
+    if !secret.is_empty() {
+        let method = "GET";
+        let payload_hash = "UNSIGNED-PAYLOAD";
+        let region = "global";
+        let service = "brog";
+
+        let url = url::Url::parse(&ep)?;
+        let sig = match sign::signature(
+            &url,
+            method,
+            &key,
+            &secret,
+            region,
+            service,
+            &machineid,
+            payload_hash,
+        ) {
+            Ok(s) => s,
+            Err(e) => return Err(anyhow::anyhow!("Signiture Creation Failure {}", e)),
+        };
+
+        let sigdatetime = HeaderValue::from_str(&sig.date_time)?;
+        let sigauth = HeaderValue::from_str(&sig.auth_header)?;
+        let machinevalue = HeaderValue::from_str(machineid.as_str().trim())?;
+
+        headers.insert(
+            HeaderName::from_static("x-mhl-content-sha256"),
+            HeaderValue::from_static("UNSIGNED-PAYLOAD"),
+        );
+
+        headers.insert(HeaderName::from_static("x-mhl-date"), sigdatetime);
+        headers.insert(AUTHORIZATION, sigauth);
+        headers.insert(HeaderName::from_static("x-mhl-mid"), machinevalue);
     }
 
     info!("Sending request");
@@ -164,7 +231,13 @@ async fn test_process_no_endpoint() {
         .mount(&mock_server)
         .await;
 
-    let result = process("".to_string(), "".to_string(), "".to_string()).await;
+    let result = process(
+        "".to_string(),
+        "".to_string(),
+        "".to_string(),
+        "".to_string(),
+    )
+    .await;
     assert!(result.is_err())
 }
 
@@ -181,13 +254,19 @@ async fn test_process_404() {
         .mount(&mock_server)
         .await;
 
-    let result = process(mock_server.uri(), "".to_string(), "".to_string()).await;
+    let result = process(
+        mock_server.uri(),
+        "".to_string(),
+        "".to_string(),
+        "".to_string(),
+    )
+    .await;
     assert!(result.is_err())
 }
 
 #[tokio::test]
 
-async fn test_process_request_ok() {
+async fn test_no_auth_process_request_ok() {
     use std::fs;
     use std::path::Path;
     use wiremock::matchers::method;
@@ -203,11 +282,122 @@ async fn test_process_request_ok() {
     let bootcpath = path.to_str().unwrap_or_default();
 
     Mock::given(method("GET"))
-        .and(wiremock::matchers::path("/"))
+        .and(wiremock::matchers::path("/brog.yaml"))
         .respond_with(rt)
         .mount(&mock_server)
         .await;
-    let result = process(mock_server.uri(), "".to_owned(), bootcpath.to_string()).await;
+    let uri = format!("{}/brog.yaml", mock_server.uri());
+    let result = process(uri, "".to_owned(), "".to_owned(), bootcpath.to_string()).await;
+    assert!(!result.is_err());
+    assert_eq!("quay.io/fedora/fedora-bootc@sha256:5aed3ee3cb05929dd33e2067a19037d8fe06dee7687b7c61739f88238dacc9c5".to_owned(), result.unwrap())
+}
+
+#[tokio::test]
+
+async fn test_auth_process_request_ok() {
+    use chrono::{DateTime, NaiveDateTime, Utc};
+    use std::collections::BTreeMap;
+    use std::convert::TryInto;
+    use std::fs;
+    use std::path::Path;
+    // use wiremock::matchers::HeaderExactMatcher;
+    use wiremock::{Match, Mock, MockServer, Request, ResponseTemplate};
+    pub struct AuthHeaderMatcher(wiremock::http::HeaderName);
+
+    impl Match for AuthHeaderMatcher {
+        fn matches(&self, request: &Request) -> bool {
+            println!("{}", &self.0);
+            let mut res = match request.headers.get("x-mhl-content-sha256") {
+                // We are ignoring multi-valued headers for simplicity
+                Some(value) => value.to_str().unwrap_or_default() == "UNSIGNED-PAYLOAD",
+                None => false,
+            };
+            if !res {
+                return false;
+            };
+            let sentdate = request.headers.get("x-mhl-date").unwrap().to_str().unwrap();
+            if !sentdate.len() == 0 {
+                return false;
+            };
+            res = match request.headers.get("host") {
+                // We are ignoring multi-valued headers for simplicity
+                Some(value) => value.to_str().unwrap_or_default().len() > 0,
+                None => false,
+            };
+            if !res {
+                return false;
+            };
+            // let res = match request.headers.get("x-mhl-mid") {
+            //     // We are ignoring multi-valued headers for simplicity
+            //     Some(value) => value.to_str().unwrap_or_default().len() > 0,
+            //     None => false,
+            // };
+            // if !res {
+            //     return false;
+            // };
+            let mut bmap = BTreeMap::new();
+            for (name, value) in request.headers.iter() {
+                bmap.insert(name.to_string(), value.to_str().unwrap().to_owned());
+            }
+
+            match request.headers.get("authorization") {
+                // We are ignoring multi-valued headers for simplicity
+                Some(value) => {
+                    let authvalue = value.to_str().unwrap_or_default();
+                    if authvalue.len() > 0 {
+                        
+                        let hostname = request.headers.get("host").unwrap().to_str().unwrap();
+                        let hosturl = format!("http://{}/brog.yaml", hostname);
+
+                        let fixdate =
+                            NaiveDateTime::parse_from_str(sentdate, "%Y%m%dT%H%M%SZ").unwrap();
+                        let parsedate = DateTime::<Utc>::from_naive_utc_and_offset(fixdate, Utc);
+                        let expected_sig = sign::create_sign(
+                            "GET",
+                            "UNSIGNED-PAYLOAD",
+                            &hosturl,
+                            &bmap,
+                            &parsedate,
+                            "ivegotthesecret",
+                            "global",
+                            "brog",
+                        )
+                        .unwrap();
+                        assert!(authvalue.to_string().contains(expected_sig.as_str()));
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+                None => false,
+            }
+        }
+    }
+
+    let mock_server = MockServer::start().await;
+    let body =
+        fs::read_to_string("samples/brog.yaml").expect("Should have been able to read the file");
+
+    let rt = ResponseTemplate::new(200).set_body_string(body);
+    let mut path = env::current_dir().unwrap_or_default();
+    let mock = Path::new("mocks");
+    path.push(mock);
+    let bootcpath = path.to_str().unwrap_or_default();
+
+    Mock::given(AuthHeaderMatcher("Authorization".try_into().unwrap()))
+        .and(wiremock::matchers::path("/brog.yaml"))
+        .respond_with(rt)
+        .mount(&mock_server)
+        .await;
+
+    let uri = format!("{}/brog.yaml", mock_server.uri());
+    let result = process(
+        uri,
+        "ivegotthekey".to_owned(),
+        "ivegotthesecret".to_owned(),
+        bootcpath.to_string(),
+    )
+    .await;
     assert!(!result.is_err());
     assert_eq!("quay.io/fedora/fedora-bootc@sha256:5aed3ee3cb05929dd33e2067a19037d8fe06dee7687b7c61739f88238dacc9c5".to_owned(), result.unwrap())
 }

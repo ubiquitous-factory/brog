@@ -1,7 +1,21 @@
 [package]
 name = "brog"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
+authors = ["Anton Whalley <anton@mehal.tech>"]
+license = "MIT"
+rust-version = "1.60"
+description = "Library for signing requests to mehal services"
+repository = "https://github.com/mehal-tech/brog"
+homepage = "https://github.com/mehal-tech/brog"
+readme = "README.md"
+documentation = "https://docs.rs/brog"
+keywords = ["brog", "mehal", "authentication", "signature", "web"]
+categories = [
+    "authentication",
+    "web-programming",
+    "web-programming::http-client",
+]
 
 [dependencies]
 anyhow = "1.0.93"
@@ -27,7 +41,7 @@ tracing-subscriber = { version = "0.3.18", features = [
 ] }
 url = "2.5.4"
 urlencoding = "2.1.3"
-messagesign = "1.0.0"
+messagesign = "2.0.1"
 
 [dev-dependencies]
 wiremock = "0.6.2"

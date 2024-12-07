@@ -262,7 +262,7 @@ async fn test_no_auth_process_request_ok() {
 
 async fn test_auth_process_request_ok() {
     use chrono::{DateTime, NaiveDateTime, Utc};
-    use messagesign::create_sign;
+    use messagesign::verification;
     use std::collections::BTreeMap;
     use std::convert::TryInto;
     use std::fs;
@@ -307,7 +307,7 @@ async fn test_auth_process_request_ok() {
                         let fixdate =
                             NaiveDateTime::parse_from_str(sentdate, "%Y%m%dT%H%M%SZ").unwrap();
                         let parsedate = DateTime::<Utc>::from_naive_utc_and_offset(fixdate, Utc);
-                        let expected_sig = create_sign(
+                        let expected_sig = verification(
                             "GET",
                             "UNSIGNED-PAYLOAD",
                             &hosturl,

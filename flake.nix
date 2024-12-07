@@ -119,9 +119,9 @@
             RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
 
             # Force use of localstack to avoid side effect during tests
-            AWS_CONFIG_FILE = "${./tests/setup/aws/config}";
-            AWS_SHARED_CREDENTIALS_FILE = "${./tests/setup/aws/credentials}";
-            AWS_ENDPOINT_URL = "http://localhost:4566";
+            # AWS_CONFIG_FILE = "${./tests/setup/aws/config}";
+            # AWS_SHARED_CREDENTIALS_FILE = "${./tests/setup/aws/credentials}";
+            # AWS_ENDPOINT_URL = "http://localhost:4566";
           };
 
           # Dev shell for cross-compilation with cross

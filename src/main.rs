@@ -1,3 +1,4 @@
+use messagesign::signature;
 use std::fs;
 use std::io::{Error, Read};
 use std::process::{Command, Stdio};
@@ -9,11 +10,6 @@ use tracing::{debug, error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION};
-
-mod sign;
-
-#[macro_use]
-extern crate error_chain;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -65,36 +61,6 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 }
 
-// let mut hasher = Sha256::default();
-//     hasher.update(canonical_req.as_bytes());
-//     let string_to = format!(
-//         "AWS4-HMAC-SHA256\n{timestamp}\n{scope}\n{hash}",
-//         timestamp = date_time.format(LONG_DATETIME_FMT),
-//         scope = scope_string(date_time, ),
-//         hash = hex::encode(hasher.finalize().as_slice())
-//     );
-//     string_to
-
-// fn sign(
-//     headers: String,
-//     secret: String,
-// ) -> Result<
-//     GenericArray<u8, UInt<UInt<UInt<UInt<UInt<UInt<UTerm, B1>, B0>, B0>, B0>, B0>, B0>>,
-//     anyhow::Error,
-// > {
-//     let mut mac = HmacSha256::new_from_slice(secret.as_bytes())?;
-//     mac.update(headers.as_bytes());
-
-//     // `result` has type `CtOutput` which is a thin wrapper around array of
-//     // bytes for providing constant time equality check
-//     let result = mac.finalize();
-//     // To get underlying array use `into_bytes`, but be careful, since
-//     // incorrect use of the code value may permit timing attacks which defeats
-//     // the security provided by the `CtOutput`
-//     Ok(result.into_bytes())
-//     //let code_bytes = result;
-// }
-
 async fn process(
     ep: String,
     key: String,
@@ -122,7 +88,7 @@ async fn process(
         let service = "brog";
 
         let url = url::Url::parse(&ep)?;
-        let sig = match sign::signature(
+        let sig = match signature(
             &url,
             method,
             &key,
@@ -296,11 +262,11 @@ async fn test_no_auth_process_request_ok() {
 
 async fn test_auth_process_request_ok() {
     use chrono::{DateTime, NaiveDateTime, Utc};
+    use messagesign::create_sign;
     use std::collections::BTreeMap;
     use std::convert::TryInto;
     use std::fs;
     use std::path::Path;
-    // use wiremock::matchers::HeaderExactMatcher;
     use wiremock::{Match, Mock, MockServer, Request, ResponseTemplate};
     pub struct AuthHeaderMatcher(wiremock::http::HeaderName);
 
@@ -308,7 +274,6 @@ async fn test_auth_process_request_ok() {
         fn matches(&self, request: &Request) -> bool {
             println!("{}", &self.0);
             let mut res = match request.headers.get("x-mhl-content-sha256") {
-                // We are ignoring multi-valued headers for simplicity
                 Some(value) => value.to_str().unwrap_or_default() == "UNSIGNED-PAYLOAD",
                 None => false,
             };
@@ -320,39 +285,29 @@ async fn test_auth_process_request_ok() {
                 return false;
             };
             res = match request.headers.get("host") {
-                // We are ignoring multi-valued headers for simplicity
                 Some(value) => value.to_str().unwrap_or_default().len() > 0,
                 None => false,
             };
             if !res {
                 return false;
             };
-            // let res = match request.headers.get("x-mhl-mid") {
-            //     // We are ignoring multi-valued headers for simplicity
-            //     Some(value) => value.to_str().unwrap_or_default().len() > 0,
-            //     None => false,
-            // };
-            // if !res {
-            //     return false;
-            // };
+
             let mut bmap = BTreeMap::new();
             for (name, value) in request.headers.iter() {
                 bmap.insert(name.to_string(), value.to_str().unwrap().to_owned());
             }
 
             match request.headers.get("authorization") {
-                // We are ignoring multi-valued headers for simplicity
                 Some(value) => {
                     let authvalue = value.to_str().unwrap_or_default();
                     if authvalue.len() > 0 {
-                        
                         let hostname = request.headers.get("host").unwrap().to_str().unwrap();
                         let hosturl = format!("http://{}/brog.yaml", hostname);
 
                         let fixdate =
                             NaiveDateTime::parse_from_str(sentdate, "%Y%m%dT%H%M%SZ").unwrap();
                         let parsedate = DateTime::<Utc>::from_naive_utc_and_offset(fixdate, Utc);
-                        let expected_sig = sign::create_sign(
+                        let expected_sig = create_sign(
                             "GET",
                             "UNSIGNED-PAYLOAD",
                             &hosturl,

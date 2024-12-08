@@ -7,6 +7,9 @@ A gitops client for bootc.
 
 [brog](https://mehal.tech/brog) aims to address this by offering a gitops model for managing updates and coupled with [clos](https://mehal.tech/clos) offer simple yet robust solutions for managing role out of updates to large edge estates.  
 
+
+[![Build](https://github.com/mehal-tech/brog/actions/workflows/build-test.yaml/badge.svg)](https://github.com/mehal-tech/brog/actions/workflows/build-test.yaml)
+
 ## usage
 
 1. In your host operating system disable automatic updates.
@@ -52,7 +55,7 @@ A gitops client for bootc.
 |---|---|
 |Open http endpoint|&#x2611;|
 |Send Machine Identifier in request|&#x2610;|
-|Integrate with secrets managment systems|&#x2610;|
+|Integrate with secrets management systems|&#x2610;|
 |Private GitHub Repo|&#x2610;|
 |Private Gitlab Repo|&#x2610;|
 |Canary Support from [CLOS](https://mehal.tech/clos)|&#x2610;|

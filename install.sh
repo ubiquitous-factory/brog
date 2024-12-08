@@ -157,7 +157,7 @@ mkdir -p "$TMP_INSTALL_DIR"
 curl -s -L "${ZIP_URL}" -o "${ZIP_PATH}"
 curl -s -L "${CHECKSUM_URL}" -o "${CHECKSUM_PATH}"
 
-echo "Extracting and veryfing checksum..."
+echo "Extracting and verifying checksum..."
 
 unzip -q -o "${ZIP_PATH}" -d "${TMP_INSTALL_DIR}"
 hash_sha256_verify "${BROG_BIN_TMP_PATH}" "${CHECKSUM_PATH}"

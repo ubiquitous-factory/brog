@@ -273,7 +273,7 @@ async fn test_no_auth_process_request_ok() {
         .await;
     let uri = format!("{}/brog.yaml", mock_server.uri());
     let result = process(uri, "".to_owned(), "".to_owned(), bootcpath.to_string()).await;
-    assert!(!result.is_err());
+    assert!(result.is_ok());
     assert_eq!(
         "quay.io/fedora/fedora-bootc@:41".to_owned(),
         result.unwrap()
@@ -307,7 +307,7 @@ async fn test_auth_process_request_ok() {
                 return false;
             };
             res = match request.headers.get("host") {
-                Some(value) => value.to_str().unwrap_or_default().len() > 0,
+                Some(value) => !value.to_str().unwrap_or_default().is_empty(),
                 None => false,
             };
             if !res {
@@ -315,7 +315,7 @@ async fn test_auth_process_request_ok() {
             };
 
             res = match request.headers.get("x-mhl-nonce") {
-                Some(value) => value.to_str().unwrap_or_default().len() > 0,
+                Some(value) => !value.to_str().unwrap_or_default().is_empty(),
                 None => false,
             };
             if !res {
@@ -330,7 +330,7 @@ async fn test_auth_process_request_ok() {
             match request.headers.get("authorization") {
                 Some(value) => {
                     let authvalue = value.to_str().unwrap_or_default();
-                    if authvalue.len() > 0 {
+                    if !authvalue.is_empty() {
                         let hostname = request.headers.get("host").unwrap().to_str().unwrap();
                         let hosturl = format!("http://{}/brog.yaml", hostname);
 
@@ -349,9 +349,9 @@ async fn test_auth_process_request_ok() {
                         )
                         .unwrap();
                         assert!(authvalue.to_string().contains(expected_sig.as_str()));
-                        return true;
+                        true
                     } else {
-                        return false;
+                        false
                     }
                 }
                 None => false,
@@ -383,7 +383,7 @@ async fn test_auth_process_request_ok() {
         bootcpath.to_string(),
     )
     .await;
-    assert!(!result.is_err());
+    assert!(result.is_ok());
     assert_eq!(
         "quay.io/fedora/fedora-bootc@:41".to_owned(),
         result.unwrap()

@@ -17,6 +17,14 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION};
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    if env::args().collect::<Vec<_>>().len() != 1 {
+        const VERSION: &str = env!("CARGO_PKG_VERSION");
+        println!("brog Server Edition v{}", VERSION);
+        println!("This process accepts no arguments.");
+        println!("See documentation https://github.com/mehal-tech/brog");
+        return Ok(());
+    }
+
     if dotenvy::dotenv().is_ok() {
         println!("Using .env")
     }

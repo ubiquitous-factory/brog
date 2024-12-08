@@ -1,88 +1,191 @@
-name: Build & tests
+## references:
+# cache: https://github.com/actions/cache/blob/main/examples.md#rust---cargo
+# audit: https://github.com/actions-rs/audit-check
+# "needs": https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idneeds
 
+name: Build
 on:
   push:
-    branches:
-      - "**"
-      - "!main"
+    branches: ["*"]
+    paths-ignore:
+      - "**/docs/**"
+      - "**.md"
+  pull_request:
+    branches: [main]
+  workflow_call:
+  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: 0
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
 
 jobs:
-
-  build-cross:
+  typos:
+    name: typos
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-
-      - uses: nixbuild/nix-quick-install-action@v27
-
-      - uses: nix-community/cache-nix-action@v5
+      - uses: actions/checkout@v4
+      - uses: crate-ci/typos@master
         with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-
+          config: ./typos.toml
 
-      - uses: cachix/cachix-action@v12
+  check:
+    name: check
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["ubuntu-latest"]
+    runs-on: ${{ matrix.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup | rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          name: brog
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-      
-      - run: nix develop .#cross -c task build-cross-linux
+          toolchain: stable
+          default: true
+          profile: minimal
+          components: clippy, rustfmt
+      - uses: mozilla-actions/sccache-action@v0.0.6
+      - run: cargo check
 
-      # Can't include darwin targets as not possible to use it on CI directly for now
-      # since it requires custom Docker images which can't be published as per Apple licenses
-      # - run: nix develop .#cross -c task build-cross-macos
+  lint:
+    name: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["ubuntu-latest"]
+        cargo-cmd:
+          - fmt --all -- --check
+          - clippy --all-targets --all-features -- -D warnings
+    runs-on: ${{ matrix.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup | rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          default: true
+          profile: minimal
+          components: clippy, rustfmt
+      - uses: mozilla-actions/sccache-action@v0.0.6
+      - run: cargo ${{ matrix['cargo-cmd'] }}
 
-  # Build and push to cachix
-  build-flake:
+  tests:
+    name: test
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["ubuntu-latest"]
+        rust: [nightly, stable]
+    runs-on: ${{ matrix.version }}
+    continue-on-error: ${{ matrix.rust == 'nightly' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup | rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.rust }}
+          default: true
+          profile: minimal
+      - uses: mozilla-actions/sccache-action@v0.0.6
+
+      - name: cargo test
+        if: ${{ github.event_name == 'pull_request' || matrix.version == 'windows-latest' }}
+        shell: bash
+        run: cargo test --verbose --all --locked
+        env:
+          RUST_LOG: debug
+          RUST_BACKTRACE: full
+
+      - name: smoke tests
+        shell: bash
+        run: |
+          cargo run -- --version
+          cargo run -- --help
+
+  coverage:
+    name: code coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-
-      - uses: nixbuild/nix-quick-install-action@v27
-
-      - uses: nix-community/cache-nix-action@v5
+      - uses: actions/checkout@v4
+      - name: setup | rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-
-
-      - uses: cachix/cachix-action@v12
+          toolchain: nightly
+          default: true
+          profile: minimal
+          components: clippy, rustfmt
+      - uses: mozilla-actions/sccache-action@v0.0.6
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Generate code coverage
+        if: ${{ github.event_name != 'pull_request' }}
+        run: cargo llvm-cov --all-features --workspace  --codecov --output-path codecov.json
+        env:
+          CARGO_GENERATE_E2E_SSH_PRIVATE_KEY: ~/.ssh/id_rsa
+          RUSTFLAGS: "--cfg e2e_tests_with_ssh_key"
+      - name: Generate code coverage
+        if: ${{ github.event_name == 'pull_request' }}
+        run: cargo llvm-cov --all-features --workspace  --codecov --output-path codecov.json
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4.6.0
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
-          name: brog
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-      
-      - run: nix build --json | jq -r '.[].outputs | to_entries[].value' | cachix push brog
-  
-  
-  test-build:
+          files: codecov.json
+          verbose: true
+          fail_ci_if_error: false
+
+  audit:
+    name: security audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-
-      - uses: nixbuild/nix-quick-install-action@v27
-
-      - name: Restore and cache Nix store
-        uses: nix-community/cache-nix-action@v5
+      - uses: actions/checkout@v4
+      - name: setup | rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-
-
-      - uses: cachix/cachix-action@v12
+          toolchain: stable
+          default: true
+          profile: minimal
+      - uses: mozilla-actions/sccache-action@v0.0.6
+      - name: audit
+        uses: actions-rs/audit-check@v1
+        continue-on-error: true
         with:
-          name: borg
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/cache@v3
-        name: setup Cargo cache
+  publish-dry-run:
+    name: publish dry run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup | rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/            
-          key: ${{ runner.os }}-${{ runner.arch }}-cargo
+          toolchain: stable
+          default: true
+          profile: minimal
+      - uses: mozilla-actions/sccache-action@v0.0.6
+      - run: cargo publish --dry-run
 
-      - run: nix develop -c task test-clippy
-      - run: nix develop -c task test-doc
-      - run: nix develop -c task test-cli
-      - run: nix develop -c task test-install
-      
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup | rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          default: true
+          profile: minimal
+      - uses: mozilla-actions/sccache-action@v0.0.6
+      - name: check documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --no-deps --all-features

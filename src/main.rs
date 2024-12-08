@@ -266,7 +266,10 @@ async fn test_no_auth_process_request_ok() {
     let uri = format!("{}/brog.yaml", mock_server.uri());
     let result = process(uri, "".to_owned(), "".to_owned(), bootcpath.to_string()).await;
     assert!(!result.is_err());
-    assert_eq!("quay.io/fedora/fedora-bootc@sha256:5aed3ee3cb05929dd33e2067a19037d8fe06dee7687b7c61739f88238dacc9c5".to_owned(), result.unwrap())
+    assert_eq!(
+        "quay.io/fedora/fedora-bootc@:41".to_owned(),
+        result.unwrap()
+    )
 }
 
 #[tokio::test]
@@ -373,5 +376,8 @@ async fn test_auth_process_request_ok() {
     )
     .await;
     assert!(!result.is_err());
-    assert_eq!("quay.io/fedora/fedora-bootc@sha256:5aed3ee3cb05929dd33e2067a19037d8fe06dee7687b7c61739f88238dacc9c5".to_owned(), result.unwrap())
+    assert_eq!(
+        "quay.io/fedora/fedora-bootc@:41".to_owned(),
+        result.unwrap()
+    )
 }

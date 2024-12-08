@@ -1,0 +1,13 @@
+[book]
+authors = ["Anton Whalley"]
+language = "en"
+multilingual = false
+src = "src"
+title = "brog documentation"
+
+[build]
+create-missing = false
+
+[output.html]
+git-repository-url = "https://github.com/mehal-tech/brog"
+edit-url-template = "https://github.com/mehal-tech/brog/edit/main/docs/{path}"

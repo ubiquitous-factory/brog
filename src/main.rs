@@ -1,4 +1,8 @@
+// SPDX-License-Identifier: MIT
+// Copyright 2024 brog Authors
+
 use messagesign::signature;
+use rand::Rng;
 use std::fs;
 use std::io::{Error, Read};
 use std::process::{Command, Stdio};
@@ -87,7 +91,12 @@ async fn process(
         let region = "global";
         let service = "brog";
 
+        let mut rng = rand::thread_rng();
+        let random_number = rng.gen::<u32>(); // Generate a random u32
+                                              // let random_bytes = rng.gen::<[u8; 16]>(); // Generate 16 random bytes
+
         let url = url::Url::parse(&ep)?;
+        let nonce = random_number.to_string();
         let sig = match signature(
             &url,
             method,
@@ -97,6 +106,7 @@ async fn process(
             service,
             &machineid,
             payload_hash,
+            &nonce,
         ) {
             Ok(s) => s,
             Err(e) => return Err(anyhow::anyhow!("Signiture Creation Failure {}", e)),
@@ -105,7 +115,7 @@ async fn process(
         let sigdatetime = HeaderValue::from_str(&sig.date_time)?;
         let sigauth = HeaderValue::from_str(&sig.auth_header)?;
         let machinevalue = HeaderValue::from_str(machineid.as_str().trim())?;
-
+        let noncevalue = HeaderValue::from_str(&nonce)?;
         headers.insert(
             HeaderName::from_static("x-mhl-content-sha256"),
             HeaderValue::from_static("UNSIGNED-PAYLOAD"),
@@ -114,6 +124,7 @@ async fn process(
         headers.insert(HeaderName::from_static("x-mhl-date"), sigdatetime);
         headers.insert(AUTHORIZATION, sigauth);
         headers.insert(HeaderName::from_static("x-mhl-mid"), machinevalue);
+        headers.insert(HeaderName::from_static("x-mhl-nonce"), noncevalue);
     }
 
     info!("Sending request");
@@ -285,6 +296,14 @@ async fn test_auth_process_request_ok() {
                 return false;
             };
             res = match request.headers.get("host") {
+                Some(value) => value.to_str().unwrap_or_default().len() > 0,
+                None => false,
+            };
+            if !res {
+                return false;
+            };
+
+            res = match request.headers.get("x-mhl-nonce") {
                 Some(value) => value.to_str().unwrap_or_default().len() > 0,
                 None => false,
             };

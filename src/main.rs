@@ -117,7 +117,7 @@ async fn process(
             &nonce,
         ) {
             Ok(s) => s,
-            Err(e) => return Err(anyhow::anyhow!("Signiture Creation Failure {}", e)),
+            Err(e) => return Err(anyhow::anyhow!("Signature Creation Failure {}", e)),
         };
 
         let sigdatetime = HeaderValue::from_str(&sig.date_time)?;

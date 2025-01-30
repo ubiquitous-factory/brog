@@ -1,6 +1,8 @@
 # brog
 A gitops client for bootc. 
 
+[![Build](https://github.com/ubiquitous-factory/brog/actions/workflows/build-test.yaml/badge.svg)](https://github.com/ubiquitous-factory/brog/actions/workflows/build-test.yaml)
+
 ## introduction
 
 [bootc](https://containers.github.io/bootc/) is a transactional, in-place operating system update mechanism based on OCI/Docker container images. It's a fantastic technology that is capable of increasing deployment velocity in edge scenarios by an order of magnitude. However the operational tooling for managing the role out of updates in a safe and consistent manner still needs to be built out by the organisations using the technologies. 

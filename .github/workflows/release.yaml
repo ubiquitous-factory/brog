@@ -14,9 +14,9 @@ env:
   IMAGE_NAMESPACE: ${{ github.repository_owner }}
 
 jobs:
-  doing-a-build:
-    uses: ubiquitous-factory/brog/.github/workflows/build-test.yml@main
-    secrets: inherit
+  # doing-a-build:
+  #  uses: ubiquitous-factory/brog/.github/workflows/build-test.yml@main
+  #  secrets: inherit
   push-ghcr:
     name: Build and push manifest
     permissions: write-all

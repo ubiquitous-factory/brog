@@ -1,7 +1,5 @@
 # brog
-A gitops client for bootc. 
-
-[![Build](https://github.com/ubiquitous-factory/brog/actions/workflows/build-test.yaml/badge.svg)](https://github.com/ubiquitous-factory/brog/actions/workflows/build-test.yaml)
+A gitops client for bootc.
 
 ## introduction
 

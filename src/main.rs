@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2024 brog Authors
 
+use dotenvy::EnvLoader;
 use messagesign::signature;
 use rand::Rng;
 use std::fs;
@@ -15,20 +16,19 @@ use tracing_subscriber::FmtSubscriber;
 
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION};
 
+#[dotenvy::load(path = "/etc/brog/.config", required = false, override_ = false)]
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     if env::args().collect::<Vec<_>>().len() != 1 {
         const VERSION: &str = env!("CARGO_PKG_VERSION");
         println!("brog Server Edition v{}", VERSION);
         println!("This process accepts no arguments.");
-        println!("See documentation https://github.com/mehal-tech/brog");
+        println!("See documentation https://github.com/ubiquitous-factory/brog");
         return Ok(());
     }
-
-    if dotenvy::dotenv().is_ok() {
-        println!("Using .env")
+    if cfg!(debug_assertions) {
+        let _ = EnvLoader::new();
     }
-
     let log_level = Level::from_str(
         env::var("LOG_LEVEL")
             .unwrap_or_else(|_| "info".to_string())
@@ -88,8 +88,6 @@ async fn process(
     let machineid = fs::read_to_string("/etc/machine-id")?;
     info!("Setting x-mhl-mid: {}", machineid.trim());
 
-    // Authorization: SharedKey myaccount:ctzMq410TV3wS7upTBcunJTDLEJwMAZuFPfr0mrrA08=
-
     let client = reqwest::Client::new();
 
     let mut headers = HeaderMap::new();
@@ -101,8 +99,7 @@ async fn process(
         let service = "brog";
 
         let mut rng = rand::thread_rng();
-        let random_number = rng.gen::<u32>(); // Generate a random u32
-                                              // let random_bytes = rng.gen::<[u8; 16]>(); // Generate 16 random bytes
+        let random_number = rng.gen::<u32>();
 
         let url = url::Url::parse(&ep)?;
         let nonce = random_number.to_string();

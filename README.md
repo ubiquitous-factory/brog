@@ -59,6 +59,14 @@ A gitops client for bootc based on the [bootc management service recommendations
 |LOG_LEVEL|Sets logging level for the service|no|debug|info|
 |CLOS_TOKEN|Required if you need canary deployments or private repo support|no|See [CLOS Service Config](https://mehal.tech/clos/brogconfig)|None|
 
+brog will look try and load environment variables from /etc/brog/.config.
+Values in config do **not** override values specified in the service definition.
+
+## development 
+
+In debug mode brog will look for a `.env` file in the root of repository. 
+It will required `ENDPOINT` and `SCHEDULE` populated.
+
 ## support matrix
 |OS|Version|Architecture|Build Folder|
 |---|---|---|---|
@@ -70,7 +78,7 @@ A gitops client for bootc based on the [bootc management service recommendations
 |---|---|
 |Open http endpoint|&#x2611;|
 |Send Machine Identifier in request|&#x2611;|
-|Integrate with secrets management systems|&#x2610;|
+|Integrate with secrets management systems|&#x2611;|
 |Private GitHub Repo|&#x2611;|
 |Private Gitlab Repo|&#x2610;|
 |Canary Support from [CLOS](https://mehal.tech/clos)|&#x2611;|

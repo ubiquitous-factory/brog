@@ -97,7 +97,7 @@ jobs:
       - name: cargo test
         if: ${{ github.event_name == 'pull_request' || matrix.version == 'windows-latest' }}
         shell: bash
-        run: cargo test --verbose --all --locked
+        run: cargo test --verbose --all
         env:
           RUST_LOG: debug
           RUST_BACKTRACE: full

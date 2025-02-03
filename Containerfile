@@ -12,5 +12,6 @@ COPY ./src ./src
 COPY Cargo.toml  ./
 RUN cargo build --release
 
-FROM scratch 
+FROM scratch
+WORKDIR /vendor/fedora_41
 COPY --from=build /app-build/target/release/brog ./

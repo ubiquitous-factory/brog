@@ -1,5 +1,5 @@
 # brog
-A gitops client for bootc.
+A gitops client for bootc based on the [bootc management service recommendations](https://github.com/containers/bootc/blob/main/docs/src/building/management-services.md).
 
 ## introduction
 
@@ -8,21 +8,47 @@ A gitops client for bootc.
 [brog](https://mehal.tech/brog) aims to address this by offering a gitops model for managing updates and coupled with [clos](https://mehal.tech/clos) offer simple yet robust solutions for managing role out of updates to large edge estates.  
 
 
+
 [![Build](https://github.com/mehal-tech/brog/actions/workflows/build-test.yaml/badge.svg)](https://github.com/mehal-tech/brog/actions/workflows/build-test.yaml)
 
 ## usage
 
-1. In your host operating system disable automatic updates.
+1. In your image mode container definition.
     ```
-    systemctl disable --now bootc-fetch-apply-updates.timer
-    ```
-
 1. In your bootc image definition copy the `brog` executable from the release container.
 
-    ```
-    FROM quay.io/mehal_tech/brog as build
+    ```dockerfile
+    # Reference the brog distribution container
+    FROM ghcr.io/ubiquitous-factory/brog as build
     ...
-    COPY --from=build /app/brog /usr/bin
+    # Disable automatic updates
+    RUN systemctl disable bootc-fetch-apply-updates.timer
+
+    # Copy the file from the distribution container
+    COPY --from=build /vendor/fedora41/brog /usr/bin
+
+    # Create the service definition 
+    # make sure to replace the `ENDPOINT` value with your gitops brog.yaml location
+    COPY <<"EOT" /usr/lib/systemd/system/brog.service
+    [Unit]
+    Description=A bootc management service
+    After=network.target
+
+    [Service]
+    Type=simple
+    RemainAfterExit=yes
+    ExecStart=/usr/bin/brog
+    TimeoutStartSec=0
+    Environment=ENDPOINT=https://YAML_HOST/brog.yaml
+    Environment=SCHEDULE="every 120 seconds"
+
+    [Install]
+    WantedBy=default.target
+    EOT
+
+    # Enable the service
+    # We prefer using systemctl over a manual symlink 
+    RUN systemctl enable brog.service
     ```
 
 1. Create a `brog.service` file based on the sample and update the `ENDPOINT` and `SCHEDULE` as required.
@@ -49,14 +75,19 @@ A gitops client for bootc.
 |LOG_LEVEL|Sets logging level for the service|no|debug|info|
 |CLOS_TOKEN|Required if you need canary deployments or private repo support|no|See [CLOS Service Config](https://mehal.tech/clos/brogconfig)|None|
 
-## Roadmap
+## support matrix
+|OS|Version|Build Folder|
+|---|---|---|
+|Fedora|41|/vendor/fedora_41|
+
+## roadmap
 
 |Item|Complete|
 |---|---|
 |Open http endpoint|&#x2611;|
-|Send Machine Identifier in request|&#x2610;|
+|Send Machine Identifier in request|&#x2611;|
 |Integrate with secrets management systems|&#x2610;|
-|Private GitHub Repo|&#x2610;|
+|Private GitHub Repo|&#x2611;|
 |Private Gitlab Repo|&#x2610;|
-|Canary Support from [CLOS](https://mehal.tech/clos)|&#x2610;|
-|Container Based Deployment|&#x2610;|
+|Canary Support from [CLOS](https://mehal.tech/clos)|&#x2611;|
+|Container Based Deployment|&#x2611;|

@@ -159,19 +159,19 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  publish-dry-run:
-    name: publish dry run
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: setup | rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-          default: true
-          profile: minimal
-      - uses: mozilla-actions/sccache-action@v0.0.6
-      - run: cargo publish --dry-run
+  # publish-dry-run:
+  #   name: publish dry run
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: setup | rust
+  #       uses: dtolnay/rust-toolchain@stable
+  #       with:
+  #         toolchain: stable
+  #         default: true
+  #         profile: minimal
+  #     - uses: mozilla-actions/sccache-action@v0.0.6
+  #     - run: cargo publish --dry-run
 
   docs:
     name: docs

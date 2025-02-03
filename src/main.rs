@@ -48,7 +48,8 @@ async fn main() -> Result<(), anyhow::Error> {
                 let key = std::env::var("BROG_KEY").unwrap_or_default();
                 let secret = std::env::var("BROG_SECRET").unwrap_or_default();
                 let ep = std::env::var("ENDPOINT").expect("ENDPOINT Not Configured");
-                let bin_path = std::env::var("BROG_PATH").unwrap_or("/usr/bin".to_owned());
+                let bin_path =
+                    std::env::var("BROG_PATH").unwrap_or("/usr/bin:/bin/sbin".to_owned());
                 match process(ep, key, secret, bin_path).await {
                     Ok(_) => {}
                     Err(e) => {

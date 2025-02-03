@@ -144,15 +144,22 @@ async fn process(
         info!("Parsing response text");
         let resptext = res.text().await?;
         let data: serde_yaml::Value = serde_yaml::from_str(&resptext)?;
+        println!("{:?}", data);
+
         let image = data["clientConfig"][0]["image"].as_str();
 
         let requiredimage = if let Some(i) = image {
             i
         } else {
-            return Err(anyhow::anyhow!(
-                "clientConfig-image is not a string {:?}",
-                image
-            ));
+            let mapimage = data["clientConfig"]["image"].as_str();
+            if let Some(i) = mapimage {
+                i
+            } else {
+                return Err(anyhow::anyhow!(
+                    "clientConfig-image is not a string {:?}",
+                    image
+                ));
+            }
         };
 
         let args = vec!["switch", requiredimage, "--apply"];
@@ -389,4 +396,32 @@ async fn test_auth_process_request_ok() {
         "quay.io/fedora/fedora-bootc@:41".to_owned(),
         result.unwrap()
     )
+}
+
+#[tokio::test]
+
+async fn test_no_auth_extended_yaml_request_ok() {
+    use std::fs;
+    use std::path::Path;
+    use wiremock::matchers::method;
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+    let mock_server = MockServer::start().await;
+    let body = fs::read_to_string("samples/brog-extended.yaml")
+        .expect("Should have been able to read the file");
+
+    let rt = ResponseTemplate::new(200).set_body_string(body);
+    let mut path = env::current_dir().unwrap_or_default();
+    let mock = Path::new("mocks");
+    path.push(mock);
+    let bootcpath = path.to_str().unwrap_or_default();
+
+    Mock::given(method("GET"))
+        .and(wiremock::matchers::path("/brog-extended.yaml"))
+        .respond_with(rt)
+        .mount(&mock_server)
+        .await;
+    let uri = format!("{}/brog-extended.yaml", mock_server.uri());
+    let result = process(uri, "".to_owned(), "".to_owned(), bootcpath.to_string()).await;
+    assert!(result.is_ok());
+    assert_eq!("quay.io/fedora/fedora-bootc:41".to_owned(), result.unwrap())
 }

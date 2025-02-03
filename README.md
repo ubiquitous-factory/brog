@@ -13,8 +13,6 @@ A gitops client for bootc based on the [bootc management service recommendations
 
 ## usage
 
-1. In your image mode container definition.
-    ```
 1. In your bootc image definition copy the `brog` executable from the release container.
 
     ```dockerfile
@@ -51,20 +49,6 @@ A gitops client for bootc based on the [bootc management service recommendations
     RUN systemctl enable brog.service
     ```
 
-1. Create a `brog.service` file based on the sample and update the `ENDPOINT` and `SCHEDULE` as required.
-   ```
-    [Service]
-    ...
-    Environment=ENDPOINT=https://yourserver/yourproject/brog.yaml
-    Environment=SCHEDULE="every 5 seconds"
-   ``` 
-
-1. Copy the  `brog.service` into your bootc definition and enable the service.
-    ```
-    COPY brog.service /etc/systemd/system
-    RUN systemctl enable brog.service
-    ```
-
 ## environment variables
 
 |Value|Description|Required|Example|Default|
@@ -76,9 +60,9 @@ A gitops client for bootc based on the [bootc management service recommendations
 |CLOS_TOKEN|Required if you need canary deployments or private repo support|no|See [CLOS Service Config](https://mehal.tech/clos/brogconfig)|None|
 
 ## support matrix
-|OS|Version|Build Folder|
-|---|---|---|
-|Fedora|41|/vendor/fedora_41|
+|OS|Version|Architecture|Build Folder|
+|---|---|---|---|
+|Fedora|41|amd64, arm64|/vendor/fedora_41|
 
 ## roadmap
 

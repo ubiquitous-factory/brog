@@ -48,9 +48,11 @@ async fn main() -> Result<(), anyhow::Error> {
                 let key = std::env::var("BROG_KEY").unwrap_or_default();
                 let secret = std::env::var("BROG_SECRET").unwrap_or_default();
                 let ep = std::env::var("ENDPOINT").expect("ENDPOINT Not Configured");
+                let servicename =
+                    std::env::var("SERVICE_NAME").unwrap_or_else(|_| "projects".to_string());
                 let bin_path =
                     std::env::var("BROG_PATH").unwrap_or("/usr/bin:/bin/sbin".to_owned());
-                match process(ep, key, secret, bin_path).await {
+                match process(ep, key, secret, bin_path, servicename).await {
                     Ok(_) => {}
                     Err(e) => {
                         error!("{}", e);
@@ -79,6 +81,7 @@ async fn process(
     key: String,
     secret: String,
     bin_path: String,
+    servicename: String,
 ) -> Result<String, anyhow::Error> {
     info!("Starting process");
     if ep == *"" {
@@ -96,7 +99,7 @@ async fn process(
         let method = "GET";
         let payload_hash = "UNSIGNED-PAYLOAD";
         let region = "global";
-        let service = "brog";
+        let service = servicename;
 
         let mut rng = rand::thread_rng();
         let random_number = rng.gen::<u32>();
@@ -109,7 +112,7 @@ async fn process(
             &key,
             &secret,
             region,
-            service,
+            &service,
             &machineid,
             payload_hash,
             &nonce,
@@ -226,6 +229,7 @@ async fn test_process_no_endpoint() {
         "".to_string(),
         "".to_string(),
         "".to_string(),
+        "brog".to_string(),
     )
     .await;
     assert!(result.is_err())
@@ -249,6 +253,7 @@ async fn test_process_404() {
         "".to_string(),
         "".to_string(),
         "".to_string(),
+        "brog".to_string(),
     )
     .await;
     assert!(result.is_err())
@@ -277,7 +282,14 @@ async fn test_no_auth_process_request_ok() {
         .mount(&mock_server)
         .await;
     let uri = format!("{}/brog.yaml", mock_server.uri());
-    let result = process(uri, "".to_owned(), "".to_owned(), bootcpath.to_string()).await;
+    let result = process(
+        uri,
+        "".to_owned(),
+        "".to_owned(),
+        bootcpath.to_string(),
+        "brog".to_string(),
+    )
+    .await;
     assert!(result.is_ok());
     assert_eq!(
         "quay.io/fedora/fedora-bootc@:41".to_owned(),
@@ -386,6 +398,7 @@ async fn test_auth_process_request_ok() {
         "ivegotthekey".to_owned(),
         "ivegotthesecret".to_owned(),
         bootcpath.to_string(),
+        "brog".to_string(),
     )
     .await;
     assert!(result.is_ok());
@@ -418,7 +431,14 @@ async fn test_no_auth_extended_yaml_request_ok() {
         .mount(&mock_server)
         .await;
     let uri = format!("{}/brog-extended.yaml", mock_server.uri());
-    let result = process(uri, "".to_owned(), "".to_owned(), bootcpath.to_string()).await;
+    let result = process(
+        uri,
+        "".to_owned(),
+        "".to_owned(),
+        bootcpath.to_string(),
+        "brog".to_string(),
+    )
+    .await;
     assert!(result.is_ok());
     assert_eq!("quay.io/fedora/fedora-bootc:41".to_owned(), result.unwrap())
 }

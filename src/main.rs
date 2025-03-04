@@ -55,7 +55,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 match process(ep, key, secret, bin_path, servicename).await {
                     Ok(_) => {}
                     Err(e) => {
-                        error!("{}", e);
+                        error!("process execution error: {}", e);
                     }
                 };
                 // // Query the next execution time for this job
@@ -88,21 +88,9 @@ async fn process(
         return Err(anyhow::anyhow!("ENTRYPOINT cannot be empty"));
     }
 
-    let machineid = match fs::read_to_string("/etc/machine-id") {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to read /etc/machine-id");
-            return Err(e.into());
-        }
-    };
+    let machineid = fs::read_to_string("/etc/machine-id")?;
 
-    let hostname = match fs::read_to_string("/proc/sys/kernel/hostname") {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to read /proc/sys/kernel/hostname");
-            return Err(e.into());
-        }
-    };
+    let hostname = fs::read_to_string("/proc/sys/kernel/hostname")?;
 
     let client = reqwest::Client::new();
 

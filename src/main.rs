@@ -91,6 +91,9 @@ async fn process(
     let machineid = fs::read_to_string("/etc/machine-id")?;
     info!("Setting x-mhl-mid: {}", machineid.trim());
 
+    let hostname = fs::read_to_string("/proc/sys/kernel/hostname")?;
+    info!("Setting x-mhl-hostname: {}", hostname.trim());
+
     let client = reqwest::Client::new();
 
     let mut headers = HeaderMap::new();
@@ -114,6 +117,7 @@ async fn process(
             region,
             &service,
             &machineid,
+            &hostname,
             payload_hash,
             &nonce,
         ) {
@@ -124,6 +128,7 @@ async fn process(
         let sigdatetime = HeaderValue::from_str(&sig.date_time)?;
         let sigauth = HeaderValue::from_str(&sig.auth_header)?;
         let machinevalue = HeaderValue::from_str(machineid.as_str().trim())?;
+        let hostnamevalue = HeaderValue::from_str(hostname.as_str().trim())?;
         let noncevalue = HeaderValue::from_str(&nonce)?;
         headers.insert(
             HeaderName::from_static("x-mhl-content-sha256"),
@@ -133,6 +138,7 @@ async fn process(
         headers.insert(HeaderName::from_static("x-mhl-date"), sigdatetime);
         headers.insert(AUTHORIZATION, sigauth);
         headers.insert(HeaderName::from_static("x-mhl-mid"), machinevalue);
+        headers.insert(HeaderName::from_static("x-mhl-hostname"), hostnamevalue);
         headers.insert(HeaderName::from_static("x-mhl-nonce"), noncevalue);
     }
 
@@ -338,6 +344,14 @@ async fn test_auth_process_request_ok() {
             if !res {
                 return false;
             };
+            res = match request.headers.get("x-mhl-hostname") {
+                Some(value) => !value.to_str().unwrap_or_default().is_empty(),
+                None => false,
+            };
+
+            if !res {
+                return false;
+            };
 
             let mut bmap = BTreeMap::new();
             for (name, value) in request.headers.iter() {
@@ -365,6 +379,9 @@ async fn test_auth_process_request_ok() {
                             "brog",
                         )
                         .unwrap();
+                        println!("{}", authvalue.to_string());
+                        println!("{}", expected_sig.as_str());
+
                         assert!(authvalue.to_string().contains(expected_sig.as_str()));
                         true
                     } else {

@@ -379,8 +379,8 @@ async fn test_auth_process_request_ok() {
                             "brog",
                         )
                         .unwrap();
-                        println!("{}", authvalue.to_string());
-                        println!("{}", expected_sig.as_str());
+                        println!("{}", authvalue);
+                        println!("{}", expected_sig);
 
                         assert!(authvalue.to_string().contains(expected_sig.as_str()));
                         true

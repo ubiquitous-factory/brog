@@ -88,11 +88,21 @@ async fn process(
         return Err(anyhow::anyhow!("ENTRYPOINT cannot be empty"));
     }
 
-    let machineid = fs::read_to_string("/etc/machine-id")?;
-    info!("Setting x-mhl-mid: {}", machineid.trim());
+    let machineid = match fs::read_to_string("/etc/machine-id") {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Failed to read /etc/machine-id");
+            return Err(e.into());
+        }
+    };
 
-    let hostname = fs::read_to_string("/proc/sys/kernel/hostname")?;
-    info!("Setting x-mhl-hostname: {}", hostname.trim());
+    let hostname = match fs::read_to_string("/proc/sys/kernel/hostname") {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Failed to read /proc/sys/kernel/hostname");
+            return Err(e.into());
+        }
+    };
 
     let client = reqwest::Client::new();
 
@@ -132,7 +142,7 @@ async fn process(
         let noncevalue = HeaderValue::from_str(&nonce)?;
         headers.insert(
             HeaderName::from_static("x-mhl-content-sha256"),
-            HeaderValue::from_static("UNSIGNED-PAYLOAD"),
+            HeaderValue::from_static(payload_hash),
         );
 
         headers.insert(HeaderName::from_static("x-mhl-date"), sigdatetime);
@@ -313,45 +323,46 @@ async fn test_auth_process_request_ok() {
     use std::fs;
     use std::path::Path;
     use wiremock::{Match, Mock, MockServer, Request, ResponseTemplate};
+    #[allow(dead_code)]
     pub struct AuthHeaderMatcher(wiremock::http::HeaderName);
 
     impl Match for AuthHeaderMatcher {
         fn matches(&self, request: &Request) -> bool {
-            println!("{}", &self.0);
-            let mut res = match request.headers.get("x-mhl-content-sha256") {
-                Some(value) => value.to_str().unwrap_or_default() == "UNSIGNED-PAYLOAD",
-                None => false,
-            };
-            if !res {
-                return false;
-            };
+            assert_eq!(
+                request
+                    .headers
+                    .get("x-mhl-content-sha256")
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
+                "UNSIGNED-PAYLOAD"
+            );
             let sentdate = request.headers.get("x-mhl-date").unwrap().to_str().unwrap();
-            if !sentdate.len() == 0 {
-                return false;
-            };
-            res = match request.headers.get("host") {
-                Some(value) => !value.to_str().unwrap_or_default().is_empty(),
-                None => false,
-            };
-            if !res {
-                return false;
-            };
+            assert!(!sentdate.is_empty());
 
-            res = match request.headers.get("x-mhl-nonce") {
-                Some(value) => !value.to_str().unwrap_or_default().is_empty(),
-                None => false,
-            };
-            if !res {
-                return false;
-            };
-            res = match request.headers.get("x-mhl-hostname") {
-                Some(value) => !value.to_str().unwrap_or_default().is_empty(),
-                None => false,
-            };
+            assert!(!request
+                .headers
+                .get("host")
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .is_empty());
 
-            if !res {
-                return false;
-            };
+            assert!(!request
+                .headers
+                .get("x-mhl-nonce")
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .is_empty());
+
+            assert!(!request
+                .headers
+                .get("x-mhl-hostname")
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .is_empty());
 
             let mut bmap = BTreeMap::new();
             for (name, value) in request.headers.iter() {
@@ -360,7 +371,7 @@ async fn test_auth_process_request_ok() {
 
             match request.headers.get("authorization") {
                 Some(value) => {
-                    let authvalue = value.to_str().unwrap_or_default();
+                    let authvalue = value.to_str().unwrap();
                     if !authvalue.is_empty() {
                         let hostname = request.headers.get("host").unwrap().to_str().unwrap();
                         let hosturl = format!("http://{}/brog.yaml", hostname);

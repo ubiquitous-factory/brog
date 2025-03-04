@@ -55,7 +55,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 match process(ep, key, secret, bin_path, servicename).await {
                     Ok(_) => {}
                     Err(e) => {
-                        error!("{}", e);
+                        error!("process execution error: {}", e);
                     }
                 };
                 // // Query the next execution time for this job
@@ -89,7 +89,8 @@ async fn process(
     }
 
     let machineid = fs::read_to_string("/etc/machine-id")?;
-    info!("Setting x-mhl-mid: {}", machineid.trim());
+
+    let hostname = fs::read_to_string("/proc/sys/kernel/hostname")?;
 
     let client = reqwest::Client::new();
 
@@ -114,6 +115,7 @@ async fn process(
             region,
             &service,
             &machineid,
+            &hostname,
             payload_hash,
             &nonce,
         ) {
@@ -124,15 +126,17 @@ async fn process(
         let sigdatetime = HeaderValue::from_str(&sig.date_time)?;
         let sigauth = HeaderValue::from_str(&sig.auth_header)?;
         let machinevalue = HeaderValue::from_str(machineid.as_str().trim())?;
+        let hostnamevalue = HeaderValue::from_str(hostname.as_str().trim())?;
         let noncevalue = HeaderValue::from_str(&nonce)?;
         headers.insert(
             HeaderName::from_static("x-mhl-content-sha256"),
-            HeaderValue::from_static("UNSIGNED-PAYLOAD"),
+            HeaderValue::from_static(payload_hash),
         );
 
         headers.insert(HeaderName::from_static("x-mhl-date"), sigdatetime);
         headers.insert(AUTHORIZATION, sigauth);
         headers.insert(HeaderName::from_static("x-mhl-mid"), machinevalue);
+        headers.insert(HeaderName::from_static("x-mhl-hostname"), hostnamevalue);
         headers.insert(HeaderName::from_static("x-mhl-nonce"), noncevalue);
     }
 
@@ -307,37 +311,46 @@ async fn test_auth_process_request_ok() {
     use std::fs;
     use std::path::Path;
     use wiremock::{Match, Mock, MockServer, Request, ResponseTemplate};
+    #[allow(dead_code)]
     pub struct AuthHeaderMatcher(wiremock::http::HeaderName);
 
     impl Match for AuthHeaderMatcher {
         fn matches(&self, request: &Request) -> bool {
-            println!("{}", &self.0);
-            let mut res = match request.headers.get("x-mhl-content-sha256") {
-                Some(value) => value.to_str().unwrap_or_default() == "UNSIGNED-PAYLOAD",
-                None => false,
-            };
-            if !res {
-                return false;
-            };
+            assert_eq!(
+                request
+                    .headers
+                    .get("x-mhl-content-sha256")
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
+                "UNSIGNED-PAYLOAD"
+            );
             let sentdate = request.headers.get("x-mhl-date").unwrap().to_str().unwrap();
-            if !sentdate.len() == 0 {
-                return false;
-            };
-            res = match request.headers.get("host") {
-                Some(value) => !value.to_str().unwrap_or_default().is_empty(),
-                None => false,
-            };
-            if !res {
-                return false;
-            };
+            assert!(!sentdate.is_empty());
 
-            res = match request.headers.get("x-mhl-nonce") {
-                Some(value) => !value.to_str().unwrap_or_default().is_empty(),
-                None => false,
-            };
-            if !res {
-                return false;
-            };
+            assert!(!request
+                .headers
+                .get("host")
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .is_empty());
+
+            assert!(!request
+                .headers
+                .get("x-mhl-nonce")
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .is_empty());
+
+            assert!(!request
+                .headers
+                .get("x-mhl-hostname")
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .is_empty());
 
             let mut bmap = BTreeMap::new();
             for (name, value) in request.headers.iter() {
@@ -346,7 +359,7 @@ async fn test_auth_process_request_ok() {
 
             match request.headers.get("authorization") {
                 Some(value) => {
-                    let authvalue = value.to_str().unwrap_or_default();
+                    let authvalue = value.to_str().unwrap();
                     if !authvalue.is_empty() {
                         let hostname = request.headers.get("host").unwrap().to_str().unwrap();
                         let hosturl = format!("http://{}/brog.yaml", hostname);
@@ -365,6 +378,9 @@ async fn test_auth_process_request_ok() {
                             "brog",
                         )
                         .unwrap();
+                        println!("{}", authvalue);
+                        println!("{}", expected_sig);
+
                         assert!(authvalue.to_string().contains(expected_sig.as_str()));
                         true
                     } else {

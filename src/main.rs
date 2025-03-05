@@ -482,6 +482,15 @@ async fn test_commit_header_ok() {
 
     impl Match for CommitHeaderMatcher {
         fn matches(&self, request: &Request) -> bool {
+            assert_eq!(
+                request
+                    .headers
+                    .get("x-clos-commit")
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
+                "123456",
+            );
             !request
                 .headers
                 .get("x-clos-commit")

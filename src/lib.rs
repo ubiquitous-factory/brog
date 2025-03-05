@@ -10,6 +10,7 @@ use std::{
 };
 use tracing::{debug, info};
 
+#[tracing::instrument(name = "execute process", skip(secret))]
 pub async fn process(
     ep: String,
     key: String,
@@ -18,14 +19,6 @@ pub async fn process(
     servicename: String,
     service_location: String,
 ) -> Result<String, anyhow::Error> {
-    debug!(
-        "Starting process - endpoint:{} key:{}, secret(empty):{} bin_path:{} servicename{}",
-        ep,
-        key,
-        secret.is_empty(),
-        bin_path,
-        servicename
-    );
     if ep == *"" {
         return Err(anyhow::anyhow!("ENTRYPOINT cannot be empty"));
     }

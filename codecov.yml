@@ -1,0 +1,3 @@
+ignore:
+  - "tests"  # ignore tests themselves but who watches the watchmen ;)
+  - "**/main.rs" # ignore main as it's covered in units

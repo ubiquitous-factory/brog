@@ -55,10 +55,12 @@ A gitops client for bootc based on the [bootc management service recommendations
 |---|---|---|---|---|
 |ENDPOINT|The location of the brog config file|yes|https://github.com/you/yourproject/brog.yaml|None|
 |SCHEDULE|CRON and English format schedule definition|yes| "1/4 * * * * *" or "every 4 seconds"|None|
-|BROG_PATH|Additional $PATH configuration for brog to find bootc|no|"/usr/local/bin"|"/usr/bin:/usr/sbin"|
 |LOG_LEVEL|Sets logging level for the service|no|debug|info|
-|CLOS_TOKEN|Required if you need canary deployments or private repo support|no|See [CLOS Service Config](https://mehal.tech/clos/brogconfig)|None|
+|SERVICE_KEY|Required if you need canary deployments or private repo support|no|See [CLOS Service Config](https://docs.mehal.tech/clos/osmanager)|None|
+|SERVICE_SECRET|Required if you need canary deployments or private repo support|no|See [CLOS Service Config](https://docs.mehal.tech/clos/osmanager)|None|
 |SERVICE_NAME|Configurable service name if you are writing a backend for brog|no|myservicename|projects|
+|BIN_PATH|Additional $PATH configuration for brog to find bootc|no|"/usr/local/bin"|"/usr/bin:/usr/sbin"|
+|CONFIG_PATH|location to write the latest commit file|no|"/etc/brog"|"/etc/brog"|
 
 brog will look try and load environment variables from /etc/brog/.config.
 Values in config do **not** override values specified in the service definition.

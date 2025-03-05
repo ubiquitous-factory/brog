@@ -28,6 +28,18 @@ async fn test_bootc_fail() {
 }
 
 #[tokio::test]
+async fn test_bootc_err_output_fail() {
+    use std::path::Path;
+    let args = vec![];
+    let mut path = env::current_dir().unwrap_or_default();
+    let mock = Path::new("mocks/error");
+    path.push(mock);
+    let bin_path = path.to_str().unwrap_or_default();
+    let res = run_command_text(args, bin_path);
+    assert!(res.is_err());
+}
+
+#[tokio::test]
 async fn test_process_no_endpoint() {
     use wiremock::matchers::method;
     use wiremock::matchers::path;

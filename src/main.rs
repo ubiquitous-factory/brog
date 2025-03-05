@@ -61,8 +61,8 @@ async fn main() -> Result<(), anyhow::Error> {
                 // // Query the next execution time for this job
                 let next_tick = l.next_tick_for_job(uuid).await;
                 match next_tick {
-                    Ok(Some(ts)) => info!("Next time for job is {:?}", ts),
-                    _ => info!("Could not get next tick for job"),
+                    Ok(Some(ts)) => debug!("Next time for job is {:?}", ts),
+                    _ => debug!("Could not get next tick for job"),
                 }
             })
         })?)
@@ -83,14 +83,23 @@ async fn process(
     bin_path: String,
     servicename: String,
 ) -> Result<String, anyhow::Error> {
-    info!("Starting process");
+    debug!(
+        "Starting process - endpoint:{} key:{}, secret(empty):{} bin_path:{} servicename{}",
+        ep,
+        key,
+        secret.is_empty(),
+        bin_path,
+        servicename
+    );
     if ep == *"" {
         return Err(anyhow::anyhow!("ENTRYPOINT cannot be empty"));
     }
 
     let machineid = fs::read_to_string("/etc/machine-id")?;
+    debug!("machineid: {}", machineid);
 
     let hostname = fs::read_to_string("/proc/sys/kernel/hostname")?;
+    debug!("hostname: {}", hostname);
 
     let client = reqwest::Client::new();
 
@@ -107,6 +116,10 @@ async fn process(
 
         let url = url::Url::parse(&ep)?;
         let nonce = random_number.to_string();
+        debug!(
+            "Signing service: method:{} payload_hash:{} region:{} nonce:{}",
+            method, payload_hash, region, nonce
+        );
         let sig = match signature(
             &url,
             method,
@@ -140,15 +153,15 @@ async fn process(
         headers.insert(HeaderName::from_static("x-mhl-nonce"), noncevalue);
     }
 
-    info!("Sending request");
+    debug!("Sending Headers:{:#?}", headers);
+
     let res = client.get(ep.clone()).headers(headers).send().await?;
     if res.status() != reqwest::StatusCode::OK {
         Err(anyhow::anyhow!("Invalid request: {}, {}", res.status(), ep))
     } else {
-        info!("Parsing response text");
         let resptext = res.text().await?;
         let data: serde_yaml::Value = serde_yaml::from_str(&resptext)?;
-        println!("{:?}", data);
+        debug!("Response YAML:{:?}", data);
 
         let image = data["clientConfig"][0]["image"].as_str();
 
@@ -165,11 +178,12 @@ async fn process(
                 ));
             }
         };
+        debug!("Setting image:{}", requiredimage);
 
         let args = vec!["switch", requiredimage, "--apply"];
         info!("Updating: {:?}", args);
         let text = run_command_text(args, bin_path.as_str())?;
-        let _data: serde_yaml::Value = serde_yaml::from_str(&text)?;
+        debug!("bootc output:{}", text);
         Ok(requiredimage.to_owned())
     }
 }

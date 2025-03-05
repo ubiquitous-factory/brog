@@ -16,6 +16,18 @@ async fn test_bootc_output() {
 }
 
 #[tokio::test]
+async fn test_bootc_fail() {
+    use std::path::Path;
+    let args = vec![];
+    let mut path = env::current_dir().unwrap_or_default();
+    let mock = Path::new("bocks");
+    path.push(mock);
+    let bin_path = path.to_str().unwrap_or_default();
+    let res = run_command_text(args, bin_path);
+    assert!(res.is_err());
+}
+
+#[tokio::test]
 async fn test_process_no_endpoint() {
     use wiremock::matchers::method;
     use wiremock::matchers::path;
@@ -98,10 +110,41 @@ async fn test_no_auth_process_request_ok() {
     )
     .await;
     assert!(result.is_ok());
-    assert_eq!(
-        "quay.io/fedora/fedora-bootc@:41".to_owned(),
-        result.unwrap()
+    assert_eq!("quay.io/fedora/fedora-bootc:41".to_owned(), result.unwrap())
+}
+
+#[tokio::test]
+async fn test_number_err() {
+    use std::fs;
+    use std::path::Path;
+    use wiremock::matchers::method;
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+    let mock_server = MockServer::start().await;
+    let body = fs::read_to_string("samples/brog-bad.yaml")
+        .expect("Should have been able to read the file");
+
+    let rt = ResponseTemplate::new(200).set_body_string(body);
+    let mut path = env::current_dir().unwrap_or_default();
+    let mock = Path::new("mocks");
+    path.push(mock);
+    let bootcpath = path.to_str().unwrap_or_default();
+
+    Mock::given(method("GET"))
+        .and(wiremock::matchers::path("/brog.yaml"))
+        .respond_with(rt)
+        .mount(&mock_server)
+        .await;
+    let uri = format!("{}/brog.yaml", mock_server.uri());
+    let result = process(
+        uri,
+        "".to_owned(),
+        "".to_owned(),
+        bootcpath.to_string(),
+        "brog".to_string(),
+        "".to_string(),
     )
+    .await;
+    assert!(result.is_err());
 }
 
 #[tokio::test]
@@ -222,10 +265,7 @@ async fn test_auth_process_request_ok() {
     )
     .await;
     assert!(result.is_ok());
-    assert_eq!(
-        "quay.io/fedora/fedora-bootc@:41".to_owned(),
-        result.unwrap()
-    )
+    assert_eq!("quay.io/fedora/fedora-bootc:41".to_owned(), result.unwrap())
 }
 
 #[tokio::test]
@@ -373,10 +413,7 @@ async fn test_commit_header_ok() {
     println!("{:#?}", result);
     assert!(result.is_ok());
 
-    assert_eq!(
-        "quay.io/fedora/fedora-bootc@:41".to_owned(),
-        result.unwrap()
-    );
+    assert_eq!("quay.io/fedora/fedora-bootc:41".to_owned(), result.unwrap());
     let mock_server_commit = MockServer::start().await;
     let body =
         fs::read_to_string("samples/brog.yaml").expect("Should have been able to read the file");
@@ -408,10 +445,7 @@ async fn test_commit_header_ok() {
     .await;
     println!("{:#?}", result);
     assert!(result.is_ok());
-    assert_eq!(
-        "quay.io/fedora/fedora-bootc@:41".to_owned(),
-        result.unwrap()
-    )
+    assert_eq!("quay.io/fedora/fedora-bootc:41".to_owned(), result.unwrap())
 }
 
 #[tokio::test]

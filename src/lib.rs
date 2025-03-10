@@ -41,8 +41,8 @@ pub async fn process(
         let region = "global";
         let service = servicename;
 
-        let mut rng = rand::thread_rng();
-        let random_number = rng.gen::<u32>();
+        let mut rng = rand::rng();
+        let random_number = rng.random::<u32>();
 
         let url = url::Url::parse(&ep)?;
         let nonce = random_number.to_string();

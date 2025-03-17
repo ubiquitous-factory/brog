@@ -9,8 +9,8 @@ A gitops client for bootc based on the [bootc management service recommendations
 
 
 
-[![Build](https://github.com/mehal-tech/brog/actions/workflows/build-test.yaml/badge.svg)](https://github.com/mehal-tech/brog/actions/workflows/build-test.yaml)
-
+[![Build](https://github.com/mehal-tech/brog/actions/workflows/build-test.yaml/badge.svg)](https://github.com/mehal-tech/brog/actions/workflows/build-test.yaml) [![codecov](https://codecov.io/github/ubiquitous-factory/brog/graph/badge.svg?token=ANXI4rEspb)](https://codecov.io/github/ubiquitous-factory/brog)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10182/badge)](https://www.bestpractices.dev/projects/10182)
 ## usage
 
 1. In your bootc image definition copy the `brog` executable from the release container.

@@ -9,7 +9,8 @@ A gitops client for bootc based on the [bootc management service recommendations
 
 
 
-[![Build](https://github.com/mehal-tech/brog/actions/workflows/build-test.yaml/badge.svg)](https://github.com/mehal-tech/brog/actions/workflows/build-test.yaml) [![codecov](https://codecov.io/github/ubiquitous-factory/brog/graph/badge.svg?token=ANXI4rEspb)](https://codecov.io/github/ubiquitous-factory/brog)
+[![Build](https://github.com/mehal-tech/brog/actions/workflows/build-test.yaml/badge.svg)](https://github.com/mehal-tech/brog/actions/workflows/build-test.yaml) 
+[![codecov](https://codecov.io/github/ubiquitous-factory/brog/graph/badge.svg?token=ANXI4rEspb)](https://codecov.io/github/ubiquitous-factory/brog)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10182/badge)](https://www.bestpractices.dev/projects/10182)
 ## usage
 
@@ -23,7 +24,7 @@ A gitops client for bootc based on the [bootc management service recommendations
     RUN systemctl disable bootc-fetch-apply-updates.timer
 
     # Copy the file from the distribution container
-    COPY --from=build /vendor/fedora41/brog /usr/bin
+    COPY --from=build /vendor/fedora_41/brog /usr/bin
 
     # Create the service definition 
     # make sure to replace the `ENDPOINT` value with your gitops brog.yaml location

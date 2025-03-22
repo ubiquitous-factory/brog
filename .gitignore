@@ -27,3 +27,5 @@ Cargo.lock
 .env
 
 .vscode
+
+sha

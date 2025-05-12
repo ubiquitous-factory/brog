@@ -27,8 +27,8 @@ A gitops client for bootc based on the [bootc management service recommendations
 
     # Create the service definition 
     # make sure to replace the `ENDPOINT` value with your gitops brog.yaml location
-    COPY <<"EOT" /usr/lib/systemd/system/brog.service
-    [Unit]
+    RUN cat <<EOF > /usr/lib/systemd/system/brog.service
+    [Unit] 
     Description=A bootc management service
     After=network.target
 
@@ -37,12 +37,12 @@ A gitops client for bootc based on the [bootc management service recommendations
     RemainAfterExit=yes
     ExecStart=/usr/bin/brog
     TimeoutStartSec=0
-    Environment=ENDPOINT=https://YAML_HOST/brog.yaml
+    Environment=ENDPOINT=https://global.mehal.tech/gitops/project/config
     Environment=SCHEDULE="every 120 seconds"
 
     [Install]
     WantedBy=default.target
-    EOT
+    EOF
 
     # Enable the service
     # We prefer using systemctl over a manual symlink 

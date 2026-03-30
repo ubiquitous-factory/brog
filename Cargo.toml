@@ -28,7 +28,7 @@ hmac = "0.12.1"
 hex = "0.4"
 reqwest = "0.13.1"
 serde_yaml = "0.9.34"
-sha2 = "0.10.8"
+sha2 = "0.11.0"
 tokio = { version = "1.17.0", default-features = false, features = [
     "macros",
     "rt-multi-thread",
